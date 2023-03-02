@@ -9,19 +9,6 @@ from googletrans import Translator
 import platform
 
 
-def configure_logger():
-    channel_name = channel.replace("#", "")
-    try:
-        os.mkdir("logs/")
-    except:
-        pass
-
-    logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s — %(message)s',
-                        datefmt='[%Y-%m-%d %H:%M:%S]',
-                        handlers=[logging.FileHandler(f'logs/{channel_name}-chat.log', encoding='utf-8')])
-
-
 def create_toast(title, text):
     _platform = platform.platform().lower().split("-")[0]
     if _platform == "macos":
@@ -80,5 +67,4 @@ if __name__ == "__main__":
     nickname = os.environ.get("nickname", False)  # your twitch username
     channel = f'#{os.environ.get("channel", nickname)}'  # channel to be spectated
 
-    configure_logger()
     main()
