@@ -6,6 +6,7 @@ from beepy import beep
 from dotenv import load_dotenv
 from emoji import demojize
 from googletrans import Translator
+import platform
 
 
 def configure_logger():
@@ -21,6 +22,24 @@ def configure_logger():
                         handlers=[logging.FileHandler(f'logs/{channel_name}-chat.log', encoding='utf-8')])
 
 
+def create_toast(title, text):
+    _platform = platform.platform().lower().split("-")[0]
+    if _platform == "macos":
+        os.system("""
+                  osascript -e 'display notification "{}" with title "{}"'
+                  """.format(text, title))
+    elif _platform == "windows":
+        from windows_toasts import WindowsToaster, ToastText1
+        wintoaster = WindowsToaster(title)
+        newToast = ToastText1()
+        newToast.SetBody(text)
+        wintoaster.show_toast(newToast)
+    elif _platform == "linux":
+        os.system(f'notify-send "{title}" "{text}"')
+    else:
+        print(f"{_platform=}")
+
+
 def main():
     translator = Translator()
     with socket.socket() as sock:
@@ -33,7 +52,7 @@ def main():
         # ignore the first 2 messages from socket
         sock.recv(2048).decode('utf-8')
         sock.recv(2048).decode('utf-8')
-        beep()
+        create_toast("Translator", "translator activated")
         while True:
             resp = sock.recv(2048).decode('utf-8')
             if channel in resp:
@@ -42,10 +61,10 @@ def main():
                 if sender.lower() not in ignored_users and clear_message:
                     detected = translator.detect(text=clear_message).lang
                     if detected != "es":
-                        beep(sound="error")
                         translated = translator.translate(clear_message, dest="es").text
-                        logging.info(f"{sender}({detected}): {clear_message}")
-                        logging.info(f"{sender}(es): {translated}")
+
+                        beep(sound="error")
+                        create_toast(f"{sender}(es) from ({detected}) in {channel}", translated)
 
 
 # run this example
@@ -62,7 +81,4 @@ if __name__ == "__main__":
     channel = f'#{os.environ.get("channel", nickname)}'  # channel to be spectated
 
     configure_logger()
-    try:
-        main()
-    except KeyboardInterrupt:
-        beep(3)
+    main()

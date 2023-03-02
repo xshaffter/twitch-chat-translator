@@ -1,4 +1,6 @@
 beepy
 pandas
-googletrans
+googletrans==3.1.0a0
 python-dotenv
+emoji
+windows_toasts; platform_system == "Windows"
