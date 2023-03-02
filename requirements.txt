@@ -1,0 +1,4 @@
+beepy
+pandas
+googletrans
+python-dotenv
