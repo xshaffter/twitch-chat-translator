@@ -1,3 +1,8 @@
+# twitch-chat-translator
+
+this app receives messages from a public chat in twitch and translates them using google translate library and displays it in real time 
+using toasts.
+
 # Install
 
 - open your console and go to the project directory
