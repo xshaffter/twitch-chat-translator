@@ -3,4 +3,5 @@ pandas
 googletrans==3.1.0a0
 python-dotenv
 emoji
+requests
 windows_toasts; platform_system == "Windows"
