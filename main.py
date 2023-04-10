@@ -113,7 +113,6 @@ class Message(object):
 class Connection(object):
 
     def __init__(self, channel_name):
-        self.logger = self.__configure_logger()
         self.server = "irc.chat.twitch.tv"
         self.port = 6667
         self.token = os.environ.get("token", False)
@@ -124,10 +123,12 @@ class Connection(object):
         self.first_buffer = 2
         self.bttv_emotes = self.__get_bttv_channel_emotes()
         self.word_counter = 0
+        self.logger = self.__configure_logger()
 
     def __configure_logger(self):
 
         logger = logging.getLogger(f"{self.channel_name}_logger")
+        logger.setLevel(logging.INFO)
         handler = logging.FileHandler(f"{self.channel_name}-chat.log", encoding='utf-8')
         handler.setLevel(logging.INFO)
         handler.setFormatter(logging.Formatter('%(asctime)s — %(message)s', datefmt='[%Y-%m-%d %H:%M:%S]'))
@@ -239,7 +240,10 @@ def create_toast(title, text):
 
 
 def configure_logger():
-    channel_name = channel.replace("#", "")
+    try:
+        os.mkdir("logs")
+    except FileExistsError:
+        pass
 
 
 def check_agv(argv):
