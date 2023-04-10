@@ -109,7 +109,6 @@ class Message(object):
     def do_count(self):
         return any([len(re.findall(f"\\b{word}\\b", self.clear_message)) >= 1 for word in self.connection.words])
 
-
 class Connection(object):
 
     def __init__(self, channel_name):
@@ -248,14 +247,12 @@ def configure_logger():
 
 def check_agv(argv):
     return argv in sys.argv
-
+    
 
 def get_channel_emotes():
     dataframe: pd.DataFrame = pd.read_csv(f"emotes/channel-emotes.csv")
     dataframe: pd.DataFrame = dataframe.loc[(dataframe["type"] == "twitch")]
     return dataframe
-
-    # run this example
 
 
 if __name__ == "__main__":
