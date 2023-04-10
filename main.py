@@ -4,6 +4,7 @@ import platform
 import re
 import socket
 import sys
+import time
 from threading import Thread
 
 import beepy
@@ -35,7 +36,7 @@ class Message(object):
         self.indexer = {}
         self.message = self.message.strip()
         self.channel = channel
-        self.sender = components.split("!")[0]
+        self.sender = components.split("!")[0][1:]
         self.clear_message = demojize(self.message.strip())
 
     def no_emotes(self):
@@ -88,7 +89,7 @@ class Message(object):
             return detected in VALID_LANGUAGES
 
     def log(self):
-        logging.info(f"{self.sender}: {self.clear_message}")
+        self.connection.logger.info(f"{self.sender}: {self.clear_message}")
         create_toast(f"{self.sender}#{channel}", self.clear_message)
 
     def notify_tag(self):
@@ -100,11 +101,13 @@ class Message(object):
 
     def log_translation(self):
         detected, translated = self.translate()
-        logging.info(f"{self.sender}({detected}): {self.clear_message}")
-        logging.info(f"{self.sender}(es): {translated}")
+        self.connection.logger.info(f"{self.sender}({detected}): {self.clear_message}")
+        self.connection.logger.info(f"{self.sender}(es): {translated}")
 
         create_toast(f"{self.sender}(es) from ({detected}) in {channel}", translated)
 
+    def do_count(self):
+        return any([len(re.findall(f"\\b{word}\\b", self.clear_message)) >= 1 for word in self.connection.words])
 
 class Connection(object):
 
@@ -113,11 +116,23 @@ class Connection(object):
         self.port = 6667
         self.token = os.environ.get("token", False)
         self.nickname = os.environ.get("nickname")
+        self.words = os.environ.get("searched_words").split(",")
         self.channel_name = channel_name
         self.channel = f"#{channel_name}"
         self.first_buffer = 2
         self.bttv_emotes = self.__get_bttv_channel_emotes()
+        self.word_counter = 0
+        self.logger = self.__configure_logger()
 
+    def __configure_logger(self):
+
+        logger = logging.getLogger(f"{self.channel_name}_logger")
+        logger.setLevel(logging.INFO)
+        handler = logging.FileHandler(f"{self.channel_name}-chat.log", encoding='utf-8')
+        handler.setLevel(logging.INFO)
+        handler.setFormatter(logging.Formatter('%(asctime)s — %(message)s', datefmt='[%Y-%m-%d %H:%M:%S]'))
+        logger.addHandler(handler)
+        return logger
     def __get_bttv_channel_emotes(self):
         dataframe = pd.read_csv("emotes/channel-emotes.csv")
         dataframe = dataframe.loc[(dataframe["type"] == "BTTV") & (dataframe["owner"] == self.channel_name)]
@@ -154,13 +169,19 @@ class Connection(object):
             if check_agv("--notify"):
                 message.notify_tag()
 
+            if check_agv("--count"):
+                if message.do_count():
+                    self.word_counter += 1
+                    print(f"{message.sender} ({self.word_counter}): {message.message}")
+                    self.logger.info(f"{message.sender} ({self.word_counter}): {message.message}")
+
             if check_agv("--translate") and not message.is_ignore_message() and not message.is_valid_language():
                 message.log_translation()
 
     def __listen(self):
         create_toast("twitch-chat", f"listener activated in #{self.channel_name}")
         while True:
-            general_resp = self.sock.recv(4096).decode('utf-8')
+            general_resp = self.sock_recv()
             clean_resp = general_resp.strip()
             responses = clean_resp.split("\n")
 
@@ -191,25 +212,20 @@ class Connection(object):
 
         return True
 
-
-def configure_logger():
-    try:
-        os.mkdir("logs/")
-    except:
-        pass
-
-    logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s — %(message)s',
-                        datefmt='[%Y-%m-%d %H:%M:%S]',
-                        handlers=[logging.FileHandler(f'logs/global_log-chat.log', encoding='utf-8')])
+    def sock_recv(self):
+        while True:
+            try:
+                return self.sock.recv(4096).decode('utf-8')
+            except ConnectionResetError:
+                time.sleep(1)
 
 
 def create_toast(title, text):
     _platform = platform.platform().lower().split("-")[0]
     if _platform == "macos":
         os.system("""
-                  osascript -e 'display notification "{}" with title "{}"'
-                  """.format(text, title))
+              osascript -e 'display notification "{}" with title "{}"'
+              """.format(text, title))
     elif _platform == "windows":
         windows_toasts = __import__("windows_toasts")
         wintoaster = windows_toasts.WindowsToaster(title)
@@ -222,9 +238,16 @@ def create_toast(title, text):
         print(f"{_platform=}")
 
 
+def configure_logger():
+    try:
+        os.mkdir("logs")
+    except FileExistsError:
+        pass
+
+
 def check_agv(argv):
     return argv in sys.argv
-
+    
 
 def get_channel_emotes():
     dataframe: pd.DataFrame = pd.read_csv(f"emotes/channel-emotes.csv")
@@ -232,7 +255,6 @@ def get_channel_emotes():
     return dataframe
 
 
-# run this example
 if __name__ == "__main__":
     load_dotenv()
     ignored_users_str = os.environ.get("IGNORED_USERS", "streamelements,nightbot").lower()
